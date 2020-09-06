@@ -1,5 +1,15 @@
 use std::{cell::RefCell, ptr, rc::Rc};
 
+#[derive(Debug)]
+pub enum ListOperationErr {
+    IndexOutOfBounds,
+    OperationOnEmptyList,
+    UnexpectedError,
+    ElementNotFound
+}
+
+const UNEXPECTED_ERR: ListOperationErr = ListOperationErr::UnexpectedError;
+
 #[derive(Debug, Clone)]
 struct ListNode<T> {
     content: Rc<RefCell<T>>,
@@ -27,11 +37,11 @@ impl<T> ListNode<T> {
 pub trait List<T>: IntoIterator + Clone {
     fn add(&mut self, item: Rc<RefCell<T>>);
     fn add_raw(&mut self, item: T);
-    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64);
-    fn insert_raw_at(&mut self, item: T, index: i64);
-    fn get(&self, index: i64) -> Rc<RefCell<T>>;
-    fn remove(&mut self, item: Rc<RefCell<T>>) -> Result<(), ()>;
-    fn remove_at(&mut self, index: i64) -> Option<Rc<RefCell<T>>>;
+    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) -> Result<(), ListOperationErr>;
+    fn insert_raw_at(&mut self, item: T, index: i64) -> Result<(), ListOperationErr>;
+    fn get(&self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr>;
+    fn remove(&mut self, item: Rc<RefCell<T>>) -> Result<(), ListOperationErr>;
+    fn remove_at(&mut self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr>;
     fn contains(&self, item: Rc<RefCell<T>>) -> bool;
     fn is_empty(&self) -> bool;
 }
@@ -71,76 +81,71 @@ impl<T> LinkedList<T> {
     }
 
     /// Check index bounds
-    fn index_check(&self, index: i64) {
+    fn index_check(&self, index: i64) -> Result<(), ListOperationErr> {
         if index < 0 || self.size <= index {
-            panic!("Index '{}' is out of bounds", index);
+            Err(ListOperationErr::IndexOutOfBounds)
+        } else {
+            Ok(())
         }
     }
 
     /// Get list node at `index`
-    fn get_node_at(&self, index: i64) -> Rc<RefCell<ListNode<T>>> {
-        self.index_check(index);
+    fn get_node_at(&self, index: i64) -> Result<Rc<RefCell<ListNode<T>>>, ListOperationErr> {
+        self.index_check(index)?;
 
         let mut cur = self.head.clone();
         for _ in 0..index {
-            cur.replace(cur.clone().unwrap().borrow().linked_node.clone().unwrap());
+            cur.replace(
+                cur.clone()
+                    .ok_or(UNEXPECTED_ERR)?
+                    .borrow()
+                    .linked_node
+                    .clone()
+                    .ok_or(UNEXPECTED_ERR)?,
+            );
         }
-        cur.unwrap()
+        cur.ok_or(UNEXPECTED_ERR)
     }
 
     /// Removes the first element of the list
-    fn shift(&mut self) -> Option<Rc<RefCell<T>>> {
-        if self.is_empty() {
-            None
-        } else {
-            // if head
-            match self.head.clone().unwrap().borrow().linked_node.clone() {
-                Some(n) => {
-                    self.size -= 1;
-                    let tmp = Some(self.head.clone().unwrap().borrow().content.clone());
-                    self.head.replace(n.clone());
-                    tmp
-                }
-                None => {
-                    // if list size = 1
-                    // reset
-                    self.size -= 1;
-                    self.head.take();
-                    Some(self.tail.take().unwrap().borrow().content.clone())
-                }
+    fn shift(&mut self) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+        // if head
+        match self.head.clone().ok_or(ListOperationErr::OperationOnEmptyList)?.borrow().linked_node.clone() {
+            Some(n) => {
+                self.size -= 1;
+                let tmp = Some(self.head.clone().ok_or(UNEXPECTED_ERR)?.borrow().content.clone());
+                self.head.replace(n.clone());
+                tmp.ok_or(UNEXPECTED_ERR)
+            }
+            None => {
+                // if list size = 1
+                // reset
+                self.size -= 1;
+                self.head.take();
+                Ok(self.tail.take().ok_or(UNEXPECTED_ERR)?.borrow().content.clone())
             }
         }
     }
 
     /// Removes the last element of the list
-    fn pop(&mut self) -> Option<Rc<RefCell<T>>> {
-        if self.is_empty() {
-            None
-        } else {
-            // if tail
-            // set node before tail node as tail
-            self.tail.replace(self.get_node_at(self.size - 2));
-            match &mut self.tail {
-                Some(ref mut n) => {
-                    // remove reference to old tail
-                    let tmp = Some(
-                        n.borrow_mut()
-                            .linked_node
-                            .take()
-                            .unwrap()
-                            .borrow()
-                            .content
-                            .clone(),
-                    );
-                    self.size -= 1;
-                    tmp
-                }
-                None => {
-                    // should not go here...
-                    panic!("Unexpected error occured while trying to invoke `pop()`")
-                }
-            }
-        }
+    fn pop(&mut self) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+        // if tail
+        // set node before tail node as tail
+        self.tail.replace(self.get_node_at(self.size - 2)?);
+
+        let n = self.tail.clone().ok_or(UNEXPECTED_ERR)?;
+
+        let tmp = n
+            .borrow_mut()
+            .linked_node
+            .take()
+            .ok_or(UNEXPECTED_ERR)?
+            .borrow()
+            .content
+            .clone();
+        self.size -= 1;
+
+        Ok(tmp)
     }
 }
 
@@ -212,8 +217,8 @@ impl<T> List<T> for LinkedList<T> {
         self.add(Rc::new(RefCell::new(item)));
     }
 
-    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) {
-        self.index_check(index);
+    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) -> Result<(), ListOperationErr> {
+        self.index_check(index)?;
 
         if index == 0 {
             // if head
@@ -225,21 +230,23 @@ impl<T> List<T> for LinkedList<T> {
             // if tail
             self.add(item);
         } else {
-            let prev = self.get_node_at(index - 1);
-            let n0 = prev.borrow().linked_node.clone().unwrap();
+            let prev = self.get_node_at(index - 1)?;
+            let n0 = prev.borrow().linked_node.clone().ok_or(UNEXPECTED_ERR)?;
             prev.borrow_mut().link_to(Rc::new(RefCell::new(ListNode {
                 content: item,
                 linked_node: Some(n0),
             })));
         }
+
+        Ok(())
     }
 
-    fn insert_raw_at(&mut self, item: T, index: i64) {
-        self.insert_at(Rc::new(RefCell::new(item)), index);
+    fn insert_raw_at(&mut self, item: T, index: i64) -> Result<(), ListOperationErr> {
+        self.insert_at(Rc::new(RefCell::new(item)), index)
     }
 
-    fn get(&self, index: i64) -> Rc<RefCell<T>> {
-        self.index_check(index);
+    fn get(&self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+        self.index_check(index)?;
 
         let mut iter = self.clone().into_iter();
 
@@ -247,7 +254,7 @@ impl<T> List<T> for LinkedList<T> {
             iter.next();
         }
 
-        iter.next().unwrap()
+        iter.next().clone().ok_or(UNEXPECTED_ERR)
     }
 
     fn contains(&self, item: Rc<RefCell<T>>) -> bool {
@@ -263,19 +270,19 @@ impl<T> List<T> for LinkedList<T> {
         result
     }
 
-    fn remove(&mut self, item: Rc<RefCell<T>>) -> Result<(), ()> {
+    fn remove(&mut self, item: Rc<RefCell<T>>) -> Result<(), ListOperationErr> {
         let mut cur = self.head.clone();
 
         // check if empty
         if self.is_empty() {
-            Err(())
+            Err(UNEXPECTED_ERR)
         }
         // if head
         else if ptr::eq(
-            cur.clone().ok_or(())?.borrow().content.as_ref(),
+            cur.clone().ok_or(UNEXPECTED_ERR)?.borrow().content.as_ref(),
             item.as_ref(),
         ) {
-            match cur.unwrap().borrow().linked_node.clone() {
+            match cur.ok_or(UNEXPECTED_ERR)?.borrow().linked_node.clone() {
                 Some(linked) => {
                     self.head.replace(linked);
                 }
@@ -293,11 +300,11 @@ impl<T> List<T> for LinkedList<T> {
             loop {
                 if ptr::eq(
                     cur.clone()
-                        .unwrap()
+                        .ok_or(UNEXPECTED_ERR)?
                         .borrow()
                         .linked_node
                         .clone()
-                        .unwrap()
+                        .ok_or(UNEXPECTED_ERR)?
                         .borrow()
                         .content
                         .as_ref(),
@@ -306,7 +313,14 @@ impl<T> List<T> for LinkedList<T> {
                     prev_node = Some(cur);
                     break;
                 } else {
-                    cur.replace(cur.clone().unwrap().borrow().linked_node.clone().unwrap());
+                    cur.replace(
+                        cur.clone()
+                            .ok_or(UNEXPECTED_ERR)?
+                            .borrow()
+                            .linked_node
+                            .clone()
+                            .ok_or(UNEXPECTED_ERR)?,
+                    );
                 }
             }
 
@@ -315,35 +329,42 @@ impl<T> List<T> for LinkedList<T> {
                 if ptr::eq(
                     prev_node
                         .clone()
-                        .unwrap()
+                        .ok_or(UNEXPECTED_ERR)?
                         .borrow()
                         .linked_node
                         .clone()
-                        .unwrap()
+                        .ok_or(UNEXPECTED_ERR)?
                         .as_ref(),
-                    self.tail.clone().unwrap().as_ref(),
+                    self.tail.clone().ok_or(UNEXPECTED_ERR)?.as_ref(),
                 ) {
-                    self.tail.replace(prev_node.clone().unwrap());
+                    self.tail.replace(prev_node.clone().ok_or(UNEXPECTED_ERR)?);
                 } else {
-                    let target_node = prev_node.clone().unwrap().borrow().linked_node.clone();
+                    let target_node = prev_node.clone().ok_or(UNEXPECTED_ERR)?.borrow().linked_node.clone();
                     prev_node
                         .clone()
-                        .unwrap()
+                        .ok_or(UNEXPECTED_ERR)?
                         .borrow_mut()
                         .linked_node
-                        .replace(target_node.unwrap().borrow().linked_node.clone().unwrap());
+                        .replace(
+                            target_node
+                                .ok_or(UNEXPECTED_ERR)?
+                                .borrow()
+                                .linked_node
+                                .clone()
+                                .ok_or(UNEXPECTED_ERR)?,
+                        );
                 }
 
                 self.size -= 1;
                 Ok(())
             } else {
-                Err(())
+                Err(ListOperationErr::ElementNotFound)
             }
         }
     }
 
-    fn remove_at(&mut self, index: i64) -> Option<Rc<RefCell<T>>> {
-        self.index_check(index);
+    fn remove_at(&mut self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+        self.index_check(index)?;
 
         if index == 0 {
             // if head
@@ -354,16 +375,16 @@ impl<T> List<T> for LinkedList<T> {
         } else {
             // otherwise...
             // get node before specified `index`
-            let n = self.get_node_at(index - 1);
+            let n = self.get_node_at(index - 1)?;
             // get node after specified `index`
-            let n_after = self.get_node_at(index).borrow().linked_node.clone();
+            let n_after = self.get_node_at(index)?.borrow().linked_node.clone();
 
             self.size -= 1;
             let result = {
                 n.borrow()
                     .linked_node
                     .clone()
-                    .unwrap()
+                    .ok_or(UNEXPECTED_ERR)?
                     .borrow()
                     .content
                     .clone()
@@ -374,7 +395,7 @@ impl<T> List<T> for LinkedList<T> {
                 n.borrow_mut().linked_node.replace(nxt);
             }
 
-            Some(result)
+            Ok(result)
         }
     }
 
