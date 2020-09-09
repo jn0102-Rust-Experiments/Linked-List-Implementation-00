@@ -80,6 +80,10 @@ pub trait List<T>: IntoIterator + Clone {
     /// #### Returns
     /// `true` if the list is empty
     fn is_empty(&self) -> bool;
+
+    /// #### Returns
+    /// Number of elements in list
+    fn size(&self) -> i64;
 }
 
 #[derive(Debug)]
@@ -227,25 +231,21 @@ impl<T> Iterator for LinkedListIterator<T> {
     type Item = Rc<RefCell<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.current {
-            Some(ref c) => {
-                let result = Some(c.clone().borrow_mut().content.clone());
+        let c = self.current.clone()?;
+        let result = Some(c.clone().borrow_mut().content.clone());
 
-                match c.clone().borrow().linked_node.clone() {
-                    Some(nxt) => {
-                        // set `current.linked_node` as current
-                        self.current.replace(nxt);
-                    }
-                    None => {
-                        // set `current` to `None`
-                        self.current.take();
-                    }
-                }
-
-                result
+        match c.borrow().linked_node.clone() {
+            Some(nxt) => {
+                // set `current.linked_node` as current
+                self.current.replace(nxt);
             }
-            None => None,
-        }
+            None => {
+                // set `current` to `None`
+                self.current.take();
+            }
+        };
+
+        result
     }
 }
 
@@ -352,14 +352,7 @@ impl<T> List<T> for LinkedList<T> {
             cur.clone().ok_or(UNEXPECTED_ERR)?.borrow().content.as_ref(),
             item.as_ref(),
         ) {
-            match cur.ok_or(UNEXPECTED_ERR)?.borrow().linked_node.clone() {
-                Some(linked) => {
-                    self.head.replace(linked);
-                }
-                None => {
-                    self.head.take();
-                }
-            }
+            let _ = self.shift();
 
             self.size -= 1;
             Ok(())
@@ -476,5 +469,9 @@ impl<T> List<T> for LinkedList<T> {
 
     fn is_empty(&self) -> bool {
         self.size < 1
+    }
+
+    fn size(&self) -> i64 {
+        self.size
     }
 }
