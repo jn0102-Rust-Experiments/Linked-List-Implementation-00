@@ -8,7 +8,7 @@ pub enum ListOperationErr {
     ElementNotFound,
 }
 
-const UNEXPECTED_ERR: ListOperationErr = ListOperationErr::UnexpectedError;
+pub const UNEXPECTED_ERR: ListOperationErr = ListOperationErr::UnexpectedError;
 
 #[derive(Debug, Clone)]
 struct ListNode<T> {
@@ -169,21 +169,35 @@ impl<T> LinkedList<T> {
     pub fn pop(&mut self) -> Result<Rc<RefCell<T>>, ListOperationErr> {
         // if tail
         // set node before tail node as tail
-        self.tail.replace(self.get_node_at(self.size - 2)?);
+        if self.size == 1 {
+            // if list size = 1
+            // reset
+            self.size -= 1;
+            self.head.take();
+            Ok(self
+                .tail
+                .take()
+                .ok_or(UNEXPECTED_ERR)?
+                .borrow()
+                .content
+                .clone())
+        } else {
+            self.tail.replace(self.get_node_at(self.size - 2)?);
 
-        let n = self.tail.clone().ok_or(UNEXPECTED_ERR)?;
+            let n = self.tail.clone().ok_or(UNEXPECTED_ERR)?;
 
-        let tmp = n
-            .borrow_mut()
-            .linked_node
-            .take()
-            .ok_or(UNEXPECTED_ERR)?
-            .borrow()
-            .content
-            .clone();
-        self.size -= 1;
+            let tmp = n
+                .borrow_mut()
+                .linked_node
+                .take()
+                .ok_or(UNEXPECTED_ERR)?
+                .borrow()
+                .content
+                .clone();
+            self.size -= 1;
 
-        Ok(tmp)
+            Ok(tmp)
+        }
     }
 
     /// Get list node at `index`
