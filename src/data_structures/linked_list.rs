@@ -50,17 +50,17 @@ pub trait List<T>: IntoIterator + Clone {
     /// insert an item at a specific index in the list
     /// #### Params
     /// - `item` - a reference to the item to insert
-    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) -> Result<(), ListOperationErr>;
+    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: usize) -> Result<(), ListOperationErr>;
 
     /// insert an item at a specific index in the list
     /// #### Params
     /// - `item` - the item to insert
-    fn insert_raw_at(&mut self, item: T, index: i64) -> Result<(), ListOperationErr>;
+    fn insert_raw_at(&mut self, item: T, index: usize) -> Result<(), ListOperationErr>;
 
     /// get a reference to the item at the specified index
     /// #### Params
     /// - `index` - the index to lookup
-    fn get(&self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr>;
+    fn get(&self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr>;
 
     /// removes the specified `item` from the list
     /// #### Params
@@ -70,7 +70,7 @@ pub trait List<T>: IntoIterator + Clone {
     /// removes the item at the specified `index`
     /// #### Params
     /// - `index` - the index of the item to remove
-    fn remove_at(&mut self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr>;
+    fn remove_at(&mut self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr>;
 
     /// checks whether `item` is in the list
     /// #### Params
@@ -83,14 +83,14 @@ pub trait List<T>: IntoIterator + Clone {
 
     /// #### Returns
     /// Number of elements in list
-    fn size(&self) -> i64;
+    fn size(&self) -> usize;
 }
 
 #[derive(Debug)]
 pub struct LinkedList<T> {
     head: Option<Rc<RefCell<ListNode<T>>>>,
     tail: Option<Rc<RefCell<ListNode<T>>>>,
-    size: i64,
+    size: usize,
 }
 
 impl<T> Clone for LinkedList<T> {
@@ -121,8 +121,8 @@ impl<T> LinkedList<T> {
     }
 
     /// Check index bounds
-    pub fn index_check(&self, index: i64) -> Result<(), ListOperationErr> {
-        if index < 0 || self.size <= index {
+    pub fn index_check(&self, index: usize) -> Result<(), ListOperationErr> {
+        if self.size <= index {
             Err(ListOperationErr::IndexOutOfBounds)
         } else {
             Ok(())
@@ -205,7 +205,7 @@ impl<T> LinkedList<T> {
     }
 
     /// Get list node at `index`
-    fn get_node_at(&self, index: i64) -> Result<Rc<RefCell<ListNode<T>>>, ListOperationErr> {
+    fn get_node_at(&self, index: usize) -> Result<Rc<RefCell<ListNode<T>>>, ListOperationErr> {
         self.index_check(index)?;
 
         let mut cur = self.head.clone();
@@ -287,7 +287,7 @@ impl<T> List<T> for LinkedList<T> {
         self.add(Rc::new(RefCell::new(item)));
     }
 
-    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) -> Result<(), ListOperationErr> {
+    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: usize) -> Result<(), ListOperationErr> {
         self.index_check(index)?;
 
         if index == 0 {
@@ -311,11 +311,11 @@ impl<T> List<T> for LinkedList<T> {
         Ok(())
     }
 
-    fn insert_raw_at(&mut self, item: T, index: i64) -> Result<(), ListOperationErr> {
+    fn insert_raw_at(&mut self, item: T, index: usize) -> Result<(), ListOperationErr> {
         self.insert_at(Rc::new(RefCell::new(item)), index)
     }
 
-    fn get(&self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+    fn get(&self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr> {
         self.index_check(index)?;
 
         let mut iter = self.clone().into_iter();
@@ -431,7 +431,7 @@ impl<T> List<T> for LinkedList<T> {
         }
     }
 
-    fn remove_at(&mut self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+    fn remove_at(&mut self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr> {
         self.index_check(index)?;
 
         if index == 0 {
@@ -471,7 +471,7 @@ impl<T> List<T> for LinkedList<T> {
         self.size < 1
     }
 
-    fn size(&self) -> i64 {
+    fn size(&self) -> usize {
         self.size
     }
 }

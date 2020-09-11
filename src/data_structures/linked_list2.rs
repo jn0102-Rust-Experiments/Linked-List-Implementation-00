@@ -24,7 +24,7 @@ impl<T: std::fmt::Debug> ListNode2<T> {
 pub struct LinkedList2<T: std::fmt::Debug> {
     head: Option<Rc<RefCell<ListNode2<T>>>>,
     tail: Option<Rc<RefCell<ListNode2<T>>>>,
-    size: i64,
+    size: usize,
 }
 
 impl<T: std::fmt::Debug> LinkedList2<T> {
@@ -38,8 +38,8 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
     }
 
     /// Check index bounds
-    pub fn index_check(&self, index: i64) -> Result<(), ListOperationErr> {
-        if index < 0 || self.size <= index {
+    pub fn index_check(&self, index: usize) -> Result<(), ListOperationErr> {
+        if self.size <= index {
             Err(ListOperationErr::IndexOutOfBounds)
         } else {
             Ok(())
@@ -135,7 +135,7 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
     }
 
     /// Get list node at `index`
-    fn get_node_at(&self, index: i64) -> Result<Rc<RefCell<ListNode2<T>>>, ListOperationErr> {
+    fn get_node_at(&self, index: usize) -> Result<Rc<RefCell<ListNode2<T>>>, ListOperationErr> {
         self.index_check(index)?;
 
         let mut cur = self.head.clone();
@@ -273,7 +273,7 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
         self.add(Rc::new(RefCell::new(item)));
     }
 
-    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: i64) -> Result<(), ListOperationErr> {
+    fn insert_at(&mut self, item: Rc<RefCell<T>>, index: usize) -> Result<(), ListOperationErr> {
         self.index_check(index)?;
 
         if index == 0 {
@@ -304,11 +304,11 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
         Ok(())
     }
 
-    fn insert_raw_at(&mut self, item: T, index: i64) -> Result<(), ListOperationErr> {
+    fn insert_raw_at(&mut self, item: T, index: usize) -> Result<(), ListOperationErr> {
         self.insert_at(Rc::new(RefCell::new(item)), index)
     }
 
-    fn get(&self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+    fn get(&self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr> {
         self.index_check(index)?;
 
         let mut iter = self.clone().into_iter();
@@ -397,7 +397,7 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
         }
     }
 
-    fn remove_at(&mut self, index: i64) -> Result<Rc<RefCell<T>>, ListOperationErr> {
+    fn remove_at(&mut self, index: usize) -> Result<Rc<RefCell<T>>, ListOperationErr> {
         self.index_check(index)?;
 
         if index == 0 {
@@ -424,7 +424,7 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
         self.size < 1
     }
 
-    fn size(&self) -> i64 {
+    fn size(&self) -> usize {
         self.size
     }
 }
