@@ -11,16 +11,35 @@ struct ListNode2<T> {
 }
 
 impl<T: std::fmt::Debug> ListNode2<T> {
+    /// Creates a new node with no linked nodes
+    /// ### Returns
+    /// a reference to the newly created node
     fn new(content: Rc<RefCell<T>>) -> Rc<RefCell<ListNode2<T>>> {
         Rc::new(RefCell::new(ListNode2 {
             content,
             linked_nodes: (None, None),
         }))
     }
+
+    /// Breaks the link between this node and the node linked through `self.linked_nodes.0`
+    /// ### Returns
+    /// a reference to the linked node (if any)
+    fn break_link0(&mut self) -> Option<Rc<RefCell<ListNode2<T>>>> {
+        let n0 = self.linked_nodes.0.take();
+        n0.clone()?.borrow_mut().linked_nodes.1.take();
+        n0
+    }
+
+    /// Breaks the link between this node and the node linked through `self.linked_nodes.1`
+    /// ### Returns
+    /// a reference to the linked node (if any)
+    fn break_link1(&mut self) -> Option<Rc<RefCell<ListNode2<T>>>> {
+        let n1 = self.linked_nodes.1.take();
+        n1.clone()?.borrow_mut().linked_nodes.0.take();
+        n1
+    }
 }
 
-/// ## TODO
-/// - Implement `List<T>`
 pub struct LinkedList2<T: std::fmt::Debug> {
     head: Option<Rc<RefCell<ListNode2<T>>>>,
     tail: Option<Rc<RefCell<ListNode2<T>>>>,
@@ -70,7 +89,7 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
                         .clone(),
                 );
                 self.head.replace(n.clone());
-                Self::break_link0(n);
+                n.borrow_mut().break_link0();
                 tmp.ok_or(UNEXPECTED_ERR)
             }
             None => {
@@ -115,7 +134,7 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
                 );
                 self.tail.replace(n.clone());
 
-                Self::break_link1(n);
+                n.borrow_mut().break_link1();
                 tmp.ok_or(UNEXPECTED_ERR)
             }
             None => {
@@ -153,18 +172,6 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
         cur.ok_or(UNEXPECTED_ERR)
     }
 
-    fn break_link0(n1: Rc<RefCell<ListNode2<T>>>) -> Option<Rc<RefCell<ListNode2<T>>>> {
-        let n0 = n1.borrow_mut().linked_nodes.0.take();
-        n0.clone()?.borrow_mut().linked_nodes.1.take();
-        n0
-    }
-
-    fn break_link1(n0: Rc<RefCell<ListNode2<T>>>) -> Option<Rc<RefCell<ListNode2<T>>>> {
-        let n1 = n0.borrow_mut().linked_nodes.1.take();
-        n1.clone()?.borrow_mut().linked_nodes.0.take();
-        n1
-    }
-
     /// Links `node0` with `node1` through `node0`'s link 1 and `node1`'s link 0
     fn link_nodes(
         node0: Rc<RefCell<ListNode2<T>>>,
@@ -173,8 +180,8 @@ impl<T: std::fmt::Debug> LinkedList2<T> {
         Option<Rc<RefCell<ListNode2<T>>>>,
         Option<Rc<RefCell<ListNode2<T>>>>,
     ) {
-        let node0_old_link = { Self::break_link1(node0.clone()) };
-        let node1_old_link = { Self::break_link0(node1.clone()) };
+        let node0_old_link = node0.borrow_mut().break_link1();
+        let node1_old_link = node1.borrow_mut().break_link0();
 
         node0.borrow_mut().linked_nodes.1.replace(node1.clone());
         node1.borrow_mut().linked_nodes.0.replace(node0.clone());
@@ -289,7 +296,7 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
             self.add(item);
         } else {
             let orig = self.get_node_at(index)?;
-            let prev = Self::break_link0(orig.clone());
+            let prev = orig.borrow_mut().break_link0();
             Self::link_nodes(
                 prev.ok_or(UNEXPECTED_ERR)?,
                 Rc::new(RefCell::new(ListNode2 {
@@ -386,7 +393,7 @@ impl<T: std::fmt::Debug> List<T> for LinkedList2<T> {
                         .clone()
                         .ok_or(UNEXPECTED_ERR)?,
                 );
-                Self::break_link1(_tail);
+                _tail.borrow_mut().break_link1();
             } else {
                 let (n0, n1) = target_node.borrow().linked_nodes.clone();
                 Self::link_nodes(n0.ok_or(UNEXPECTED_ERR)?, n1.ok_or(UNEXPECTED_ERR)?);
