@@ -1,2 +1,2 @@
-# Linked-List-Implementation-00
+# Rc Linked List
 Linked list implementation using `Rc<RefCell<T>>`
